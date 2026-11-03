@@ -8,6 +8,15 @@ val signingProps = Properties()
 val signingPropsFile = rootProject.file("signing.properties")
 if (signingPropsFile.exists()) signingProps.load(signingPropsFile.inputStream())
 
+// Pull-request debug builds do not receive release secrets. Only create the
+// release signing config when every required property is present.
+val releaseSigningConfigured = listOf(
+    "KEYSTORE_FILE",
+    "KEYSTORE_PASSWORD",
+    "KEY_ALIAS",
+    "KEY_PASSWORD"
+).all { !signingProps.getProperty(it).isNullOrBlank() }
+
 android {
     namespace = "df.root"
     compileSdk = 37
@@ -29,11 +38,13 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            storeFile = file(signingProps.getProperty("KEYSTORE_FILE"))
-            storePassword = signingProps.getProperty("KEYSTORE_PASSWORD")
-            keyAlias = signingProps.getProperty("KEY_ALIAS")
-            keyPassword = signingProps.getProperty("KEY_PASSWORD")
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = file(requireNotNull(signingProps.getProperty("KEYSTORE_FILE")))
+                storePassword = requireNotNull(signingProps.getProperty("KEYSTORE_PASSWORD"))
+                keyAlias = requireNotNull(signingProps.getProperty("KEY_ALIAS"))
+                keyPassword = requireNotNull(signingProps.getProperty("KEY_PASSWORD"))
+            }
         }
     }
 
@@ -43,7 +54,9 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
