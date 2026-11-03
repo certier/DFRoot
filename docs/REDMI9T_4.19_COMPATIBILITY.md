@@ -109,7 +109,7 @@ References:
 ## Changes in this branch
 
 - Lowers minSdk from 32 to 31 for Android 12 / API 31 installation.
-- Adds read-only device and kernel diagnostics.
+- Adds read-only device diagnostics and a best-effort `/proc/config.gz` summary for module-signing and ESP-related kernel options.
 - Disables the UI launch action when the kernel family has no embedded LKM.
 - Adds a Java-side guard in ExploitRunner before the native helper is started.
 - Does not add a 4.19 exploit or kernel module and does not claim Redmi 9T root
