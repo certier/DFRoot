@@ -43,6 +43,7 @@ public class MainActivity extends Activity implements IReporter {
     private final Handler mMain = new Handler(Looper.getMainLooper());
     private final Executor mExec = Executors.newSingleThreadExecutor();
     private int mValidSuManagerPos = 0;
+    private boolean mKernelProfileAvailable = false;
 
     @Override
     public void report(String msg) {
@@ -65,6 +66,9 @@ public class MainActivity extends Activity implements IReporter {
         outputScroll = findViewById(R.id.outputScroll);
         outputView = findViewById(R.id.outputView);
         spinnerSuManager = findViewById(R.id.spinnerSuManager);
+
+        mKernelProfileAvailable = DeviceCompatibility.hasEmbeddedKernelProfile();
+        outputView.setText(DeviceCompatibility.buildReport());
 
         PackageManager pm = getPackageManager();
         List<SuManagerEntry> entries = new ArrayList<>();
@@ -131,7 +135,7 @@ public class MainActivity extends Activity implements IReporter {
     }
 
     private void updateRunButton() {
-        btnRun.setEnabled(mValidSuManagerPos >= 1 && !new File("/dev/df").exists());
+        btnRun.setEnabled(mKernelProfileAvailable && mValidSuManagerPos >= 1 && !new File("/dev/df").exists());
     }
 
     private void runExploit() {
@@ -140,6 +144,7 @@ public class MainActivity extends Activity implements IReporter {
             String msg = rc == 0 ? "DFRoot: SUCCESS"
                        : rc == 1 ? "DFRoot: Error - ksud nonzero exit"
                        : rc == 2 ? "DFRoot: Error - check logcat & dmesg"
+                       : rc == 4 ? "DFRoot: Unsupported kernel profile - no changes attempted"
                        : "DFRoot: Error - failed to patch files";
             mMain.post(() -> Toast.makeText(this, msg, Toast.LENGTH_LONG).show());
         } catch (Exception e) {
