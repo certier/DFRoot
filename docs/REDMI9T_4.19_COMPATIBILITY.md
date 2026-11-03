@@ -25,41 +25,86 @@ app path; it is not a claim that a 4.19 port exists.
 
 ## Kernel-source matching status
 
+The exact source revision for MIUI 14.0.3.0 (SJQMIXM) has not been identified.
+
+Two public source candidates were inspected:
+
+- `javashin/android_kernel_xiaomi_bengal`, main at
+  `29655da8082e7d68f1b61191cb337a06c5f70c69`, has a 4.19.157 Makefile and
+  `arch/arm64/configs/vendor/bengal-perf_defconfig`. Its defconfig sets
+  `CONFIG_LOCALVERSION="-perf"`, `CONFIG_KALLSYMS_ALL=y`,
+  `CONFIG_MODVERSIONS=y`, and `CONFIG_MODULE_SIG_FORCE=y`. Its visible
+  source head is dated 2021-12-07, so it is a candidate baseline, not proof of
+  the 2023 stock build's exact source or module ABI.
+- `Elchanz3/kernel-for-lime`, branch `sapphire`, has a 4.19.157 Makefile
+  and a Bengal perf defconfig. That configuration identifies itself as
+  `-AOSPA/sapphire`, so it is a custom-ROM kernel source, not a stock MIUI
+  match.
+
 The suffix `g1a6087bc0325` is present in a public kernel repository as the
-value of its `localversion` file. That commit only changes the local-version
-label, and that repository's Makefile reports Linux 4.19.191. This is a useful
-search lead, not proof that its source revision produced this phone's
-4.19.157 kernel. Do not use its module ABI or symbols as a match for this
-device without further evidence.
+value of a `localversion` file. The commit only changes the local-version
+label, and that repository's Makefile reports Linux 4.19.191. It is not a
+source match for this phone's 4.19.157 kernel.
 
 The Xiaomi public kernel-source index lists `lime-q-oss` for Android Q devices
 (Redmi Note 9 4G / POCO M3), not a verified Android 12 MIUI 14 source match for
-the supplied fingerprint. Community bengal/lime trees are also not assumed
-to match this specific stock kernel.
+the supplied fingerprint. Community Bengal/Lime trees must not be assumed to
+match this specific stock kernel.
 
-## DirtyFrag / CVE status
+## DirtyFrag / CVE-2026-43284 source audit
 
-DFRoot's current exploit uses the XFRM/IPsec ESP path (CVE-2026-43284). The
-Linux CVE announcement says the upstream issue was introduced in Linux 6.5.
-A stock upstream 4.19 tree therefore does not contain that later-introduced
-change. Downstream vendors can backport code, so the version string alone
-cannot establish whether the same vulnerable code exists in Xiaomi's kernel.
+The earlier statement that CVE-2026-43284 was introduced only in Linux 6.5
+was too broad and has been corrected. The current Linux CVE record tracks the
+ESP issue to code introduced in 4.11. A 4.19-specific CIP backport is recorded
+at 4.19.325-cip133, so a 4.19 kernel cannot be dismissed based only on its
+major/minor version.
 
-CVE-2026-43500 is a distinct RxRPC path. Its upstream issue was introduced in
-Linux 5.3, so stock upstream 4.19 does not contain that later-introduced
-change either. A vendor backport remains possible; additionally, DFRoot's
-current ESP implementation does not automatically exploit RxRPC.
+The 4.19 backport is especially relevant because it adapts the fix to the
+legacy `ip_append_page()` path. Its patch:
+- marks page fragments shared in IPv4 `ip_append_page()`;
+- makes IPv4 ESP input avoid its in-place fast path when
+  `skb_has_shared_frag()` is true;
+- applies the corresponding shared-fragment check to IPv6 ESP input.
 
-No exploit test or module load has been attempted on the device. Root support
-is unconfirmed.
+The inspected 4.19.157 community candidates contain the legacy
+`ip_append_page()` and ESP no-COW fast paths, but do not show those three
+backport changes. This is a source-level warning only: neither candidate is
+the verified source for the user's stock MIUI kernel, and no runtime
+vulnerability test has been performed.
+
+CVE-2026-43500 is a distinct RxRPC path. DFRoot's present implementation uses
+XFRM/IPsec ESP and does not automatically exercise RxRPC.
+
+## Module ABI and signing constraints
+
+The candidate Bengal perf defconfig enables loadable modules, module
+versioning and forced module signatures. A module that merely compiles for
+generic 4.19.157 is therefore not sufficient: the running kernel's exact
+configuration, symbol versions, signing/trust policy and vendor symbol layout
+must match. These values have not been confirmed for the running MIUI kernel.
+
+## Current result
+
+No exploit test, page-cache write, kernel-module load or root attempt has been
+performed on the device. No 4.19 module has been built or validated. Root
+support remains unconfirmed and the app continues to block the unsupported
+launch path.
 
 References:
-- https://lists.openwall.net/linux-cve-announce/2026/05/08/1
-- https://lists.openwall.net/linux-cve-announce/2026/05/11/1
-- https://github.com/Joe7500/kernel_xiaomi_chime/commit/22dc325737729f8f678304533642f06a669186d7
-- https://github.com/Joe7500/kernel_xiaomi_chime
-- https://github.com/MiCode/Xiaomi_Kernel_OpenSource
-- https://github.com/certier/DFRoot
+- Current Linux CVE record:
+  https://kernel.googlesource.com/pub/scm/linux/security/vulns/+/09b74d1628ea888153f0194df38a4c2f3a80ba5f/cve/published/2026/CVE-2026-43284.mbox
+- 4.19.325-cip133 fix version and patch ID:
+  https://kernelscan.io/cve/CVE-2026-43284
+- 4.19 backport commit:
+  https://github.com/bengal-upstream/kernel_xiaomi_bengal/commit/d985920ced659354abba0d845c9ccadda6ef80da
+- 4.19.157 Bengal candidate:
+  https://github.com/javashin/android_kernel_xiaomi_bengal
+- Lime/Bengal custom-ROM candidate:
+  https://github.com/Elchanz3/kernel-for-lime
+- Xiaomi public kernel-source index:
+  https://github.com/MiCode/Xiaomi_Kernel_OpenSource
+- DFRoot:
+  https://github.com/certier/DFRoot
 
 ## Changes in this branch
 
@@ -74,11 +119,12 @@ References:
 
 1. Exact source revision used for MIUI 14.0.3.0 (SJQMIXM), including vendor
    patches, not just a similarly named community kernel.
-2. Matching defconfig and generated kernel configuration.
-3. Audit of the vendor XFRM/ESP and RxRPC implementations and relevant
+2. Matching generated kernel configuration, symbol-version data and signing
+   trust policy.
+3. Audit of the stock XFRM/ESP and RxRPC implementations and relevant
    backports.
-4. Kernel module ABI data and build configuration.
-5. A separately validated, device-specific module and a recovery plan.
+4. A device-specific module build and independent validation away from the
+   user's primary system, with a tested recovery plan.
 
 Until this evidence exists, DFRoot intentionally reports the device as
 unsupported rather than attempting an unverified root operation.
