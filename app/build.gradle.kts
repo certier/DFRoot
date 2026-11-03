@@ -18,10 +18,10 @@ android {
 
     defaultConfig {
         applicationId = "df.root"
-        minSdk = 32
+        minSdk = 31
         targetSdk = 37
-        versionCode = 407
-        versionName = "4.7"
+        versionCode = 408
+        versionName = "4.8-redmi9t-dev"
 
         ndk {
             abiFilters += listOf("arm64-v8a")
